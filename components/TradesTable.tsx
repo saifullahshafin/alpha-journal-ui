@@ -6,6 +6,7 @@ import type { Trade } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
 import { ArrowUpCircle, ArrowDownCircle, Edit2, Check, X, RefreshCw, Eye, Trash2 } from "lucide-react";
 import { updateTradeAction, triggerSyncAction, deleteTradeAction } from "@/app/actions";
+import EditTradeModal from "./EditTradeModal";
 
 interface TradesTableProps {
     trades: Trade[];
@@ -32,12 +33,9 @@ export default function TradesTable({ trades }: TradesTableProps) {
     const [filter, setFilter] = useState({ status: "ALL", action: "ALL", search: "" });
     const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "open_time", dir: "desc" });
 
-    // Edit state
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editValues, setEditValues] = useState<{ symbol: string; action: string; entry_price: string; open_time: string }>({
-        symbol: "", action: "", entry_price: "", open_time: ""
-    });
-    const [isSaving, setIsSaving] = useState(false);
+    // Edit & Delete state
+    const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
     const filtered = trades
@@ -78,44 +76,6 @@ export default function TradesTable({ trades }: TradesTableProps) {
     };
 
     const getProfit = (t: Trade) => t.net_profit ?? t.profit ?? null;
-
-    const startEdit = (e: React.MouseEvent, t: Trade) => {
-        e.stopPropagation();
-        setEditingId(t.id);
-        const ot = t.open_time ?? t.created_at;
-        const localDtStr = ot ? new Date(ot).toISOString().slice(0, 16) : ""; // YYYY-MM-DDThh:mm format
-        setEditValues({
-            symbol: t.symbol ?? "",
-            action: t.action === "BUY" || t.action === "SELL" ? t.action : "BUY",
-            entry_price: t.entry_price?.toString() ?? "",
-            open_time: localDtStr
-        });
-    };
-
-    const cancelEdit = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setEditingId(null);
-    };
-
-    const saveEdit = async (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-        setIsSaving(true);
-        try {
-            // Reconstruct payload
-            const updates = {
-                symbol: editValues.symbol.trim().toUpperCase(),
-                action: editValues.action.toUpperCase(),
-                entry_price: parseFloat(editValues.entry_price) || null,
-                open_time: editValues.open_time ? new Date(editValues.open_time).toISOString() : null
-            };
-            await updateTradeAction(id, updates);
-            setEditingId(null);
-        } catch (err) {
-            alert("Failed to save changes.");
-        } finally {
-            setIsSaving(false);
-        }
-    };
 
     const handleSync = async () => {
         setIsSyncing(true);
@@ -200,36 +160,17 @@ export default function TradesTable({ trades }: TradesTableProps) {
                             const isLoss = pips != null && pips < 0;
                             const pipsColor = isWin ? "#34d399" : isLoss ? "#fb7185" : "#a3a3a3";
 
-                            const isEditing = editingId === trade.id;
-
                             return (
                                 <tr
                                     key={trade.id}
-                                    className={`group transition-all ${isEditing ? "bg-[#141414]" : "hover:bg-[#1a1a1a]"}`}
+                                    className="group transition-all hover:bg-[#1a1a1a]"
                                     style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
                                 >
                                     <td className="px-4 py-3 min-w-[100px]">
-                                        {isEditing ? (
-                                            <input
-                                                value={editValues.symbol}
-                                                onChange={(e) => setEditValues({ ...editValues, symbol: e.target.value })}
-                                                className={inputClass} placeholder="BTCUSD"
-                                            />
-                                        ) : (
-                                            <span className="text-white font-semibold text-sm">{trade.symbol ?? "—"}</span>
-                                        )}
+                                        <span className="text-white font-semibold text-sm">{trade.symbol ?? "—"}</span>
                                     </td>
                                     <td className="px-4 py-3 min-w-[110px]">
-                                        {isEditing ? (
-                                            <select
-                                                value={editValues.action}
-                                                onChange={(e) => setEditValues({ ...editValues, action: e.target.value })}
-                                                className={inputClass}
-                                            >
-                                                <option value="BUY">BUY</option>
-                                                <option value="SELL">SELL</option>
-                                            </select>
-                                        ) : trade.action ? (
+                                        {trade.action ? (
                                             <span className="flex items-center gap-1.5 text-xs font-bold"
                                                 style={{ color: trade.action === "BUY" ? "#34d399" : "#fb7185" }}>
                                                 {trade.action === "BUY"
@@ -240,14 +181,7 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                         ) : "—"}
                                     </td>
                                     <td className="px-4 py-3 text-[#a3a3a3] text-sm font-mono min-w-[120px]">
-                                        {isEditing ? (
-                                            <input
-                                                type="number" step="0.01"
-                                                value={editValues.entry_price}
-                                                onChange={(e) => setEditValues({ ...editValues, entry_price: e.target.value })}
-                                                className={inputClass} placeholder="1.0500"
-                                            />
-                                        ) : trade.entry_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
+                                        {trade.entry_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
                                     </td>
                                     <td className="px-4 py-3 text-sm font-mono" style={{ color: pipsColor }}>
                                         {trade.close_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
@@ -264,62 +198,62 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                         {trade.lot_size ?? "—"}
                                     </td>
                                     <td className="px-4 py-3 text-[#a3a3a3] text-xs whitespace-nowrap font-mono min-w-[160px]">
-                                        {isEditing ? (
-                                            <input
-                                                type="datetime-local"
-                                                value={editValues.open_time}
-                                                onChange={(e) => setEditValues({ ...editValues, open_time: e.target.value })}
-                                                className={inputClass}
-                                            />
-                                        ) : formatDate(trade.open_time ?? trade.created_at)}
+                                        {formatDate(trade.open_time ?? trade.created_at)}
                                     </td>
                                     <td className="px-4 py-3 w-[100px]"><StatusBadge status={trade.status} /></td>
 
                                     {/* Edit Controls */}
-                                    <td className="px-4 py-3 text-right h-12 flex items-center justify-end w-[120px]">
-                                        {isEditing ? (
-                                            <div className="flex gap-1 bg-[#1a1a1a] p-1 rounded-md border border-white/10">
-                                                <button onClick={cancelEdit} className="p-1 text-[#fb7185] hover:bg-[#fb7185]/20 rounded transition-colors" title="Cancel">
-                                                    <X size={14} />
-                                                </button>
-                                                <button onClick={(e) => saveEdit(e, trade.id)} disabled={isSaving} className="p-1 text-[#34d399] hover:bg-[#34d399]/20 rounded transition-colors" title="Save">
-                                                    <Check size={14} />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center border border-white/10 rounded-md overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity bg-[#141414]">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); router.push(`/vault/${trade.id}`); }}
-                                                    className="p-1.5 px-2 text-[#a3a3a3] hover:text-[#22d3ee] hover:bg-[#22d3ee]/10 transition-colors border-r border-white/10"
-                                                    title="View Vault"
-                                                >
-                                                    <Eye size={14} />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => startEdit(e, trade)}
-                                                    className="p-1.5 px-2 text-[#a3a3a3] hover:text-white hover:bg-white/10 transition-colors border-r border-white/10"
-                                                    title="Edit Trade"
-                                                >
-                                                    <Edit2 size={13} />
-                                                </button>
-                                                <button
-                                                    onClick={async (e) => {
-                                                        e.stopPropagation();
-                                                        if (confirm("Are you sure you want to delete this trade?")) {
+                                    <td className="px-4 py-3 text-right h-12 flex items-center justify-end min-w-[130px]">
+                                        <div className="flex items-center border border-white/10 rounded-md overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity bg-[#141414]">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); router.push(`/vault/${trade.id}`); }}
+                                                className="p-1.5 px-2 text-[#a3a3a3] hover:text-[#22d3ee] hover:bg-[#22d3ee]/10 transition-colors border-r border-white/10"
+                                                title="View Vault"
+                                            >
+                                                <Eye size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setEditingTrade(trade); }}
+                                                className="p-1.5 px-2 text-[#a3a3a3] hover:text-white hover:bg-white/10 transition-colors border-r border-white/10"
+                                                title="Edit Trade"
+                                            >
+                                                <Edit2 size={13} />
+                                            </button>
+                                            
+                                            {deletingId === trade.id ? (
+                                                <div className="flex items-center">
+                                                    <button 
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
                                                             try {
                                                                 await deleteTradeAction(trade.id);
                                                             } catch (err) {
                                                                 alert("Failed to delete trade.");
+                                                            } finally {
+                                                                setDeletingId(null);
                                                             }
-                                                        }
-                                                    }}
+                                                        }}
+                                                        className="p-1 text-[10px] font-bold uppercase tracking-wider text-black bg-[#fb7185] hover:bg-red-400 px-2 transition-colors border-r border-white/10"
+                                                    >
+                                                        Confirm
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setDeletingId(null); }}
+                                                        className="p-1 text-[#a3a3a3] hover:text-white hover:bg-white/10 px-2 transition-colors"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setDeletingId(trade.id); }}
                                                     className="p-1.5 px-2 text-[#a3a3a3] hover:text-[#fb7185] hover:bg-[#fb7185]/10 transition-colors"
                                                     title="Delete Trade"
                                                 >
                                                     <Trash2 size={14} />
                                                 </button>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             );
@@ -327,6 +261,13 @@ export default function TradesTable({ trades }: TradesTableProps) {
                     </tbody>
                 </table>
             </div>
+
+            {editingTrade && (
+                <EditTradeModal 
+                    trade={editingTrade} 
+                    onClose={() => setEditingTrade(null)} 
+                />
+            )}
         </div>
     );
 }
