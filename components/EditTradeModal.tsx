@@ -100,7 +100,7 @@ export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) 
                             </div>
                             <div>
                                 <label className={labelClass}>Side</label>
-                                <select className={inputClass} value={form.action} onChange={e => setForm({...form, action: e.target.value})}>
+                                <select className={inputClass} value={form.action} onChange={e => setForm({...form, action: e.target.value as "BUY" | "SELL"})}>
                                     <option value="BUY">BUY</option>
                                     <option value="SELL">SELL</option>
                                 </select>
@@ -110,7 +110,7 @@ export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className={labelClass}>Status</label>
-                                <select className={inputClass} value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
+                                <select className={inputClass} value={form.status} onChange={e => setForm({...form, status: e.target.value as "DRAFT" | "VERIFIED" | "SYNC"})}>
                                     <option value="DRAFT">DRAFT</option>
                                     <option value="SYNC">SYNC</option>
                                     <option value="VERIFIED">VERIFIED</option>
