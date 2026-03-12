@@ -13,6 +13,16 @@ export async function updateTradeAction(id: string, updates: any) {
     revalidatePath("/journal");
 }
 
+export async function deleteTradeAction(id: string) {
+    const { error } = await supabase.from("trades").delete().eq("id", id);
+    if (error) {
+        console.error("Delete failed:", error);
+        throw new Error(error.message);
+    }
+    revalidatePath("/");
+    revalidatePath("/journal");
+}
+
 export async function triggerSyncAction() {
     try {
         const webhookUrl = process.env.NEXT_PUBLIC_MODAL_WEBHOOK_URL;

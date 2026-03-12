@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Trade } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
-import { ArrowUpCircle, ArrowDownCircle, Edit2, Check, X, RefreshCw } from "lucide-react";
-import { updateTradeAction, triggerSyncAction } from "@/app/actions";
+import { ArrowUpCircle, ArrowDownCircle, Edit2, Check, X, RefreshCw, Eye, Trash2 } from "lucide-react";
+import { updateTradeAction, triggerSyncAction, deleteTradeAction } from "@/app/actions";
 
 interface TradesTableProps {
     trades: Trade[];
@@ -205,8 +205,7 @@ export default function TradesTable({ trades }: TradesTableProps) {
                             return (
                                 <tr
                                     key={trade.id}
-                                    onClick={() => !isEditing && router.push(`/vault/${trade.id}`)}
-                                    className={`group transition-all ${isEditing ? "bg-[#141414]" : "hover:bg-[#1a1a1a] cursor-pointer"}`}
+                                    className={`group transition-all ${isEditing ? "bg-[#141414]" : "hover:bg-[#1a1a1a]"}`}
                                     style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
                                 >
                                     <td className="px-4 py-3 min-w-[100px]">
@@ -277,7 +276,7 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                     <td className="px-4 py-3 w-[100px]"><StatusBadge status={trade.status} /></td>
 
                                     {/* Edit Controls */}
-                                    <td className="px-4 py-3 text-right h-12 flex items-center justify-end w-[80px]">
+                                    <td className="px-4 py-3 text-right h-12 flex items-center justify-end w-[120px]">
                                         {isEditing ? (
                                             <div className="flex gap-1 bg-[#1a1a1a] p-1 rounded-md border border-white/10">
                                                 <button onClick={cancelEdit} className="p-1 text-[#fb7185] hover:bg-[#fb7185]/20 rounded transition-colors" title="Cancel">
@@ -287,14 +286,40 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                                     <Check size={14} />
                                                 </button>
                                             </div>
-                                        ) : trade.status === "DRAFT" ? (
-                                            <button
-                                                onClick={(e) => startEdit(e, trade)}
-                                                className="p-1.5 text-[#a3a3a3] hover:text-white rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-white/10"
-                                            >
-                                                <Edit2 size={13} />
-                                            </button>
-                                        ) : null}
+                                        ) : (
+                                            <div className="flex items-center border border-white/10 rounded-md overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity bg-[#141414]">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); router.push(`/vault/${trade.id}`); }}
+                                                    className="p-1.5 px-2 text-[#a3a3a3] hover:text-[#22d3ee] hover:bg-[#22d3ee]/10 transition-colors border-r border-white/10"
+                                                    title="View Vault"
+                                                >
+                                                    <Eye size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => startEdit(e, trade)}
+                                                    className="p-1.5 px-2 text-[#a3a3a3] hover:text-white hover:bg-white/10 transition-colors border-r border-white/10"
+                                                    title="Edit Trade"
+                                                >
+                                                    <Edit2 size={13} />
+                                                </button>
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm("Are you sure you want to delete this trade?")) {
+                                                            try {
+                                                                await deleteTradeAction(trade.id);
+                                                            } catch (err) {
+                                                                alert("Failed to delete trade.");
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="p-1.5 px-2 text-[#a3a3a3] hover:text-[#fb7185] hover:bg-[#fb7185]/10 transition-colors"
+                                                    title="Delete Trade"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </td>
                                 </tr>
                             );
