@@ -36,3 +36,13 @@ export async function triggerSyncAction() {
         return { success: false, error: e.message };
     }
 }
+
+export async function updateAISettingsAction(settings: any) {
+    const { error } = await supabase.from("ai_settings").update(settings).match({ id: settings.id });
+    if (error) {
+        console.error("Update AI settings failed:", error);
+        throw new Error(error.message);
+    }
+    revalidatePath("/settings");
+    return { success: true };
+}

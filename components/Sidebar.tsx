@@ -9,6 +9,7 @@ import {
     Brain,
     Activity,
     Zap,
+    Settings as SettingsIcon,
 } from "lucide-react";
 
 const navItems = [
@@ -17,6 +18,7 @@ const navItems = [
     { href: "/vault", label: "The Vault", icon: Shield },
     { href: "/sentinel", label: "AI Sentinel", icon: Brain },
     { href: "/health", label: "System Health", icon: Activity },
+    { href: "/settings", label: "AI Settings", icon: SettingsIcon },
 ];
 
 export default function Sidebar() {
