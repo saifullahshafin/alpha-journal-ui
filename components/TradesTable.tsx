@@ -129,8 +129,8 @@ export default function TradesTable({ trades }: TradesTableProps) {
             </div>
 
             {/* Table */}
-            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.05)" }}>
-                <table className="w-full relative group/table">
+            <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid rgba(255,255,255,0.05)" }}>
+                <table className="w-full min-w-[1100px] relative group/table">
                     <thead style={{ background: "#0f0f0f" }}>
                         <tr>
                             <th className={thClass} onClick={() => toggleSort("symbol")}>Symbol</th>
@@ -142,7 +142,7 @@ export default function TradesTable({ trades }: TradesTableProps) {
                             <th className={thClass}>Lots</th>
                             <th className={thClass} onClick={() => toggleSort("open_time")}>Open Time</th>
                             <th className={thClass} onClick={() => toggleSort("status")}>Status</th>
-                            <th className={thClass}></th>
+                            <th className={`${thClass} text-right`}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -203,8 +203,9 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                     <td className="px-4 py-3 w-[100px]"><StatusBadge status={trade.status} /></td>
 
                                     {/* Edit Controls */}
-                                    <td className="px-4 py-3 text-right h-12 flex items-center justify-end min-w-[130px]">
-                                        <div className="flex items-center border border-white/10 rounded-md overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity bg-[#141414]">
+                                    <td className="px-4 py-3 text-right min-w-[160px]">
+                                        <div className="flex items-center justify-end w-full h-full">
+                                            <div className="flex items-center border border-white/10 rounded-md overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity bg-[#141414]">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); router.push(`/vault/${trade.id}`); }}
                                                 className="p-1.5 px-2 text-[#a3a3a3] hover:text-[#22d3ee] hover:bg-[#22d3ee]/10 transition-colors border-r border-white/10"
@@ -240,6 +241,7 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); setDeletingId(null); }}
                                                         className="p-1 text-[#a3a3a3] hover:text-white hover:bg-white/10 px-2 transition-colors"
+                                                        title="Cancel Delete"
                                                     >
                                                         <X size={14} />
                                                     </button>
@@ -253,6 +255,7 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                                     <Trash2 size={14} />
                                                 </button>
                                             )}
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Trade } from "@/lib/types";
-import { X, Save, Image as ImageIcon } from "lucide-react";
+import { X, Save, Image as ImageIcon, Plus } from "lucide-react";
 import { updateTradeAction } from "@/app/actions";
 
 interface EditTradeModalProps {
@@ -12,6 +13,16 @@ interface EditTradeModalProps {
 
 export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) {
     const [isSaving, setIsSaving] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        // Prevent background scrolling when modal is open
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = "unset";
+        };
+    }, []);
     
     // Format timestamp for datetime-local input safely
     const formatForInput = (isoDate: string | null | undefined) => {
@@ -34,8 +45,10 @@ export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) 
         lot_size: trade.lot_size?.toString() || "",
         open_time: formatForInput(trade.open_time || trade.created_at),
         user_notes: trade.user_notes || "",
-        image_urls: trade.image_urls ? trade.image_urls.join("\n") : "",
     });
+
+    const [images, setImages] = useState<string[]>(trade.image_urls || []);
+    const [newImageUrl, setNewImageUrl] = useState("");
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -51,7 +64,7 @@ export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) 
                 lot_size: parseFloat(form.lot_size) || null,
                 open_time: form.open_time ? new Date(form.open_time).toISOString() : null,
                 user_notes: form.user_notes.trim() || null,
-                image_urls: form.image_urls.trim() ? form.image_urls.split("\n").map(u => u.trim()).filter(Boolean) : null,
+                image_urls: images.length > 0 ? images : null,
             };
             
             await updateTradeAction(trade.id, updates);
@@ -67,8 +80,8 @@ export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) 
     const inputClass = "bg-[#141414] border border-white/10 text-white text-sm px-3 py-2 rounded-lg outline-none focus:border-[#22d3ee]/50 w-full transition-colors";
     const labelClass = "text-xs font-semibold text-[#a3a3a3] mb-1.5 block uppercase tracking-wider";
 
-    return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+    const modalContent = (
+        <div className="fixed inset-0 z-[100] flex justify-end bg-black/60 backdrop-blur-sm">
             {/* Click outside to close */}
             <div className="absolute inset-0" onClick={onClose} />
             
@@ -172,14 +185,63 @@ export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) 
                         </div>
                         <div>
                             <label className={labelClass + " flex items-center gap-1.5"}>
-                                <ImageIcon size={12} /> Chart Screenshots (One URL per line)
+                                <ImageIcon size={12} /> Chart Screenshots
                             </label>
-                            <textarea 
-                                className={`${inputClass} min-h-[80px] font-mono text-xs whitespace-nowrap overflow-x-auto placeholder:text-white/20`} 
-                                value={form.image_urls} 
-                                onChange={e => setForm({...form, image_urls: e.target.value})}
-                                placeholder="https://example.com/chart1.png&#10;https://example.com/chart2.png"
-                            />
+
+                            {/* Image Grid */}
+                            {images.length > 0 && (
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                    {images.map((url, idx) => (
+                                        <div key={idx} className="relative group rounded-md overflow-hidden bg-[#1a1a1a] border border-white/5 aspect-video isolate">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={url} alt="Screenshot" className="w-full h-full object-cover" />
+                                            {/* Delete Button */}
+                                            <button 
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImages(images.filter((_, i) => i !== idx)); }}
+                                                className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 z-20 cursor-pointer"
+                                                title="Delete screenshot"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                            {/* Quick link overlay */}
+                                            <a href={url} target="_blank" rel="noreferrer" className="absolute inset-0 z-10" title="Open image in new tab" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Add Image Input */}
+                            <div className="flex gap-2">
+                                <input 
+                                    type="url" 
+                                    placeholder="Paste image URL here..." 
+                                    className={inputClass} 
+                                    value={newImageUrl} 
+                                    onChange={e => setNewImageUrl(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            if (newImageUrl.trim()) {
+                                                setImages([...images, newImageUrl.trim()]);
+                                                setNewImageUrl("");
+                                            }
+                                        }
+                                    }}
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        if (newImageUrl.trim()) {
+                                            setImages([...images, newImageUrl.trim()]);
+                                            setNewImageUrl("");
+                                        }
+                                    }}
+                                    className="px-3 py-2 bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-white/10 rounded-lg text-sm font-bold transition-colors shrink-0 flex items-center justify-center text-white"
+                                    title="Add screenshot"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -204,4 +266,7 @@ export default function EditTradeModal({ trade, onClose }: EditTradeModalProps) 
             </div>
         </div>
     );
+
+    if (!mounted) return null;
+    return createPortal(modalContent, document.body);
 }
