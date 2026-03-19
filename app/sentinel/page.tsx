@@ -1,13 +1,17 @@
 import { getTrades, computeKPIs } from "@/lib/trades";
 import KPICard from "@/components/KPICard";
 import SyncButton from "@/components/SyncButton";
+import { getSyncSourceAction } from "@/app/actions";
 import { Brain, TrendingDown, AlertTriangle, Clock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function SentinelPage() {
-    const trades = await getTrades();
+    const [trades, syncSource] = await Promise.all([
+        getTrades(),
+        getSyncSourceAction(),
+    ]);
     const kpi = computeKPIs(trades);
 
     const drafts = trades.filter((t) => t.status === "DRAFT");
@@ -33,7 +37,7 @@ export default async function SentinelPage() {
                         Behavioral diagnostics and edge health monitoring.
                     </p>
                 </div>
-                <SyncButton />
+                <SyncButton initialSource={syncSource} />
             </div>
 
             {/* Diagnostics Bento Grid */}

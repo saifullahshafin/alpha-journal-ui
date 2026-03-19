@@ -4,15 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Trade } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
-import { ArrowUpCircle, ArrowDownCircle, Edit2, Check, X, RefreshCw, Eye, Trash2 } from "lucide-react";
-import { updateTradeAction, triggerSyncAction, deleteTradeAction } from "@/app/actions";
+import { ArrowUpCircle, ArrowDownCircle, Edit2, X, RefreshCw, Eye, Trash2, Sparkles } from "lucide-react";
+import { updateTradeAction, triggerSyncAction, deleteTradeAction, clearDuplicatesAction } from "@/app/actions";
 import EditTradeModal from "./EditTradeModal";
 
 interface TradesTableProps {
     trades: Trade[];
 }
 
-type SortKey = "open_time" | "symbol" | "status" | "action" | "pips" | "net_profit";
+type SortKey = "open_time" | "symbol" | "status" | "action" | "net_profit";
 
 function formatDate(dateStr: string | null | undefined): string {
     if (!dateStr) return "—";
@@ -37,6 +37,8 @@ export default function TradesTable({ trades }: TradesTableProps) {
     const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isDeduping, setIsDeduping] = useState(false);
+    const [dedupResult, setDedupResult] = useState<string | null>(null);
 
     const filtered = trades
         .filter((t) => {
@@ -65,15 +67,6 @@ export default function TradesTable({ trades }: TradesTableProps) {
         }`;
 
     const thClass = "px-4 py-2 text-left text-[10px] font-medium text-[#a3a3a3] uppercase tracking-widest cursor-pointer hover:text-white transition-colors select-none";
-    const inputClass = "bg-[#141414] border border-white/10 text-white text-xs px-2 py-1 rounded w-full outline-none focus:border-[#22d3ee]/50";
-
-    const getPips = (t: Trade) => {
-        if (t.pips != null) return t.pips;
-        if (!t.close_price || !t.entry_price) return null;
-        return t.action === "BUY"
-            ? Math.round((t.close_price - t.entry_price) * 10) / 10
-            : Math.round((t.entry_price - t.close_price) * 10) / 10;
-    };
 
     const getProfit = (t: Trade) => t.net_profit ?? t.profit ?? null;
 
@@ -86,6 +79,29 @@ export default function TradesTable({ trades }: TradesTableProps) {
             alert("Sync crashed.");
         } finally {
             setIsSyncing(false);
+        }
+    };
+
+    const handleDedup = async () => {
+        setIsDeduping(true);
+        setDedupResult(null);
+        try {
+            const res = await clearDuplicatesAction();
+            if (res.success) {
+                setDedupResult(
+                    res.deletedCount === 0
+                        ? "✅ No duplicates found."
+                        : `✅ Cleaned ${res.deletedCount} duplicate records.`
+                );
+            } else {
+                setDedupResult("❌ Cleanup failed: " + res.error);
+            }
+        } catch (err) {
+            setDedupResult("❌ Cleanup crashed.");
+        } finally {
+            setIsDeduping(false);
+            // Auto-clear the message after 4 seconds
+            setTimeout(() => setDedupResult(null), 4000);
         }
     };
 
@@ -118,10 +134,27 @@ export default function TradesTable({ trades }: TradesTableProps) {
                     {filtered.length} trades
                 </span>
 
+                {/* Dedup Result Flash */}
+                {dedupResult && (
+                    <span className="text-xs font-medium px-3 py-1 rounded-full border border-white/10 bg-[#141414] text-[#a3a3a3] transition-all">
+                        {dedupResult}
+                    </span>
+                )}
+
+                <button
+                    onClick={handleDedup}
+                    disabled={isDeduping}
+                    className="flex items-center gap-1.5 bg-[#fb7185]/10 text-[#fb7185] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#fb7185]/20 transition-colors border border-[#fb7185]/20"
+                    title="Remove old Myfxbook SYNC trades with no broker ticket or user notes"
+                >
+                    <Sparkles size={14} className={isDeduping ? "animate-pulse" : ""} />
+                    {isDeduping ? "CLEANING..." : "CLEAR DUPES"}
+                </button>
+
                 <button
                     onClick={handleSync}
                     disabled={isSyncing}
-                    className="flex items-center gap-1.5 bg-[#22d3ee]/10 text-[#22d3ee] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#22d3ee]/20 transition-colors border border-[#22d3ee]/20 ml-2"
+                    className="flex items-center gap-1.5 bg-[#22d3ee]/10 text-[#22d3ee] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#22d3ee]/20 transition-colors border border-[#22d3ee]/20"
                 >
                     <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
                     {isSyncing ? "SYNCING..." : "FORCE SYNC"}
@@ -130,14 +163,13 @@ export default function TradesTable({ trades }: TradesTableProps) {
 
             {/* Table */}
             <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid rgba(255,255,255,0.05)" }}>
-                <table className="w-full min-w-[1100px] relative group/table">
+                <table className="w-full min-w-[1000px] relative group/table">
                     <thead style={{ background: "#0f0f0f" }}>
                         <tr>
                             <th className={thClass} onClick={() => toggleSort("symbol")}>Symbol</th>
                             <th className={thClass} onClick={() => toggleSort("action")}>Side</th>
                             <th className={thClass}>Entry</th>
                             <th className={thClass}>Close</th>
-                            <th className={thClass} onClick={() => toggleSort("pips")}>Pips</th>
                             <th className={thClass} onClick={() => toggleSort("net_profit")}>Net P&L</th>
                             <th className={thClass}>Lots</th>
                             <th className={thClass} onClick={() => toggleSort("open_time")}>Open Time</th>
@@ -148,17 +180,16 @@ export default function TradesTable({ trades }: TradesTableProps) {
                     <tbody>
                         {filtered.length === 0 && (
                             <tr>
-                                <td colSpan={10} className="text-center text-[#a3a3a3] text-sm py-12">
+                                <td colSpan={9} className="text-center text-[#a3a3a3] text-sm py-12">
                                     No trades found.
                                 </td>
                             </tr>
                         )}
                         {filtered.map((trade) => {
-                            const pips = getPips(trade);
                             const profit = getProfit(trade);
-                            const isWin = pips != null && pips > 0;
-                            const isLoss = pips != null && pips < 0;
-                            const pipsColor = isWin ? "#34d399" : isLoss ? "#fb7185" : "#a3a3a3";
+                            const isWin = profit != null && profit > 0;
+                            const isLoss = profit != null && profit < 0;
+                            const profitColor = isWin ? "#34d399" : isLoss ? "#fb7185" : "#a3a3a3";
 
                             return (
                                 <tr
@@ -183,13 +214,10 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                     <td className="px-4 py-3 text-[#a3a3a3] text-sm font-mono min-w-[120px]">
                                         {trade.entry_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
                                     </td>
-                                    <td className="px-4 py-3 text-sm font-mono" style={{ color: pipsColor }}>
+                                    <td className="px-4 py-3 text-sm font-mono" style={{ color: profitColor }}>
                                         {trade.close_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
                                     </td>
-                                    <td className="px-4 py-3 text-sm font-bold tabular-nums" style={{ color: pipsColor }}>
-                                        {pips != null ? (pips > 0 ? `+${pips}` : `${pips}`) : "—"}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm font-bold tabular-nums" style={{ color: pipsColor }}>
+                                    <td className="px-4 py-3 text-sm font-bold tabular-nums" style={{ color: profitColor }}>
                                         {profit != null
                                             ? (profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`)
                                             : "—"}
@@ -203,7 +231,7 @@ export default function TradesTable({ trades }: TradesTableProps) {
                                     <td className="px-4 py-3 w-[100px]"><StatusBadge status={trade.status} /></td>
 
                                     {/* Edit Controls */}
-                                    <td className="px-4 py-3 text-right min-w-[160px]">
+                                    <td className="px-4 py-3 text-right min-w-[140px]">
                                         <div className="flex items-center justify-end w-full h-full">
                                             <div className="flex items-center border border-white/10 rounded-md overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity bg-[#141414]">
                                             <button

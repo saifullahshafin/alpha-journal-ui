@@ -7,6 +7,8 @@ export interface AISettings {
     max_tokens: number;
     model_name: string;
     updated_at?: string;
+    sync_source?: "ifxhub" | "myfxbook";
+    ifxhub_token_expiry?: string | null;
 }
 
 export async function getAISettings(): Promise<AISettings | null> {
@@ -22,3 +24,4 @@ export async function getAISettings(): Promise<AISettings | null> {
     }
     return data as AISettings;
 }
+

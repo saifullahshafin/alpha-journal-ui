@@ -1,5 +1,6 @@
 import { getAISettings } from "@/lib/settings";
 import AISettingsForm from "@/components/AISettingsForm";
+import SyncProviderPanel from "@/components/SyncProviderPanel";
 import { Settings as SettingsIcon, BrainCircuit } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +41,15 @@ export default async function SettingsPage() {
                 </div>
             </div>
 
-            {/* Main Form Component */}
+            {/* Sync Provider Control — Data Source Section */}
+            <div className="relative z-10">
+                <SyncProviderPanel
+                    initialSource={(initialSettings.sync_source ?? "ifxhub") as "ifxhub" | "myfxbook"}
+                    initialTokenExpiry={initialSettings.ifxhub_token_expiry ?? null}
+                />
+            </div>
+
+            {/* AI Agent Settings Form */}
             <div className="relative z-10">
                 <AISettingsForm initialSettings={initialSettings} />
             </div>
