@@ -9,6 +9,10 @@ export interface AISettings {
     updated_at?: string;
     sync_source?: "ifxhub" | "myfxbook";
     ifxhub_token_expiry?: string | null;
+    ifx_email?: string;
+    ifx_password?: string;
+    forex_account_no?: string;
+    account_name?: string;
 }
 
 export async function getAISettings(): Promise<AISettings | null> {

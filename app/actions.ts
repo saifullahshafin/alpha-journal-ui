@@ -86,20 +86,38 @@ export async function triggerSyncAction() {
         const { data } = await supabase.from("ai_settings").select("sync_source").limit(1).single();
         const syncSource = data?.sync_source ?? "ifxhub";
 
-        const ifxhubUrl  = process.env.NEXT_PUBLIC_IFXHUB_WEBHOOK_URL;
+        const ifxhubUrl   = process.env.NEXT_PUBLIC_IFXHUB_WEBHOOK_URL;
         const myfxbookUrl = process.env.NEXT_PUBLIC_MODAL_WEBHOOK_URL;
 
         const webhookUrl = syncSource === "myfxbook" ? myfxbookUrl : ifxhubUrl;
 
         if (!webhookUrl) {
             // Demo/dev mode — simulate success
-            return { success: true, source: syncSource };
+            return { success: true, source: syncSource, async: false };
         }
 
-        await fetch(webhookUrl, { method: "POST" });
-        revalidatePath("/");
-        revalidatePath("/journal");
-        return { success: true, source: syncSource };
+        // Fire-and-forget: Modal job runs in background (~30-60s)
+        // The Modal engine will POST to /api/revalidate when done to refresh the UI
+        fetch(webhookUrl, { method: "POST" }).catch(() => {});
+        return { success: true, source: syncSource, async: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+/**
+ * triggerAuthAction: Forces the Modal Playwright auth worker to run,
+ * extracting a fresh next-auth.session-token from IFXhub.
+ * Use this when recent trades are missing (token may have expired).
+ */
+export async function triggerAuthAction(): Promise<{ success: boolean; error?: string }> {
+    try {
+        const authUrl = process.env.NEXT_PUBLIC_IFXHUB_AUTH_URL;
+        if (!authUrl) {
+            return { success: false, error: "Auth webhook URL not configured (NEXT_PUBLIC_IFXHUB_AUTH_URL)." };
+        }
+        fetch(authUrl, { method: "POST" }).catch(() => {});
+        return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
     }

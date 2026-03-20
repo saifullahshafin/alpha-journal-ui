@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Trade } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
 import { ArrowUpCircle, ArrowDownCircle, Edit2, X, RefreshCw, Eye, Trash2, Sparkles } from "lucide-react";
-import { updateTradeAction, triggerSyncAction, deleteTradeAction, clearDuplicatesAction } from "@/app/actions";
+import { updateTradeAction, triggerSyncAction, triggerAuthAction, deleteTradeAction, clearDuplicatesAction } from "@/app/actions";
 import EditTradeModal from "./EditTradeModal";
 
 interface TradesTableProps {
@@ -38,7 +38,9 @@ export default function TradesTable({ trades }: TradesTableProps) {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isDeduping, setIsDeduping] = useState(false);
+    const [isReAuthing, setIsReAuthing] = useState(false);
     const [dedupResult, setDedupResult] = useState<string | null>(null);
+    const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const filtered = trades
         .filter((t) => {
@@ -74,11 +76,46 @@ export default function TradesTable({ trades }: TradesTableProps) {
         setIsSyncing(true);
         try {
             const res = await triggerSyncAction();
-            if (!res?.success) alert("Sync failed: " + res?.error);
+            if (!res?.success) {
+                alert("Sync failed: " + res?.error);
+                return;
+            }
+            // Sync job is async in Modal (~30-90s). Poll router.refresh() until data arrives.
+            if (res.async) {
+                let elapsed = 0;
+                syncPollRef.current = setInterval(() => {
+                    elapsed += 15;
+                    router.refresh();
+                    if (elapsed >= 90) {
+                        clearInterval(syncPollRef.current!);
+                        syncPollRef.current = null;
+                        setIsSyncing(false);
+                    }
+                }, 15000);
+            } else {
+                router.refresh();
+                setIsSyncing(false);
+            }
         } catch (err) {
             alert("Sync crashed.");
-        } finally {
             setIsSyncing(false);
+        }
+    };
+
+    const handleReAuth = async () => {
+        setIsReAuthing(true);
+        try {
+            const res = await triggerAuthAction();
+            if (!res?.success) {
+                alert("Re-Auth failed: " + res?.error);
+            } else {
+                // After re-auth, trigger a sync automatically
+                setTimeout(() => handleSync(), 3000);
+            }
+        } catch (err) {
+            alert("Re-Auth crashed.");
+        } finally {
+            setTimeout(() => setIsReAuthing(false), 5000);
         }
     };
 
@@ -152,8 +189,18 @@ export default function TradesTable({ trades }: TradesTableProps) {
                 </button>
 
                 <button
+                    onClick={handleReAuth}
+                    disabled={isReAuthing || isSyncing}
+                    className="flex items-center gap-1.5 bg-[#a78bfa]/10 text-[#a78bfa] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#a78bfa]/20 transition-colors border border-[#a78bfa]/20"
+                    title="Force re-authentication with iFXhub to fetch a fresh session token. Use when recent trades are missing."
+                >
+                    <RefreshCw size={14} className={isReAuthing ? "animate-spin" : ""} />
+                    {isReAuthing ? "RE-AUTHING..." : "RE-AUTH"}
+                </button>
+
+                <button
                     onClick={handleSync}
-                    disabled={isSyncing}
+                    disabled={isSyncing || isReAuthing}
                     className="flex items-center gap-1.5 bg-[#22d3ee]/10 text-[#22d3ee] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#22d3ee]/20 transition-colors border border-[#22d3ee]/20"
                 >
                     <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
